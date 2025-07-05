@@ -35,13 +35,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .gradient-text {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
         .scrollbar-hide {
             -ms-overflow-style: none;
             scrollbar-width: none;
@@ -49,6 +42,15 @@
         
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
+        }
+        
+        .live-indicator {
+            animation: blink 2s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
         }
     </style>
 </head>
@@ -60,6 +62,10 @@
                 🎯 Student Name Pairing System
             </h1>
             <p class="text-gray-600">Enter your name to find your perfect study partner!</p>
+            <div class="flex items-center justify-center mt-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full live-indicator mr-2"></div>
+                <span class="text-sm text-gray-500">Live - Shared across all users</span>
+            </div>
         </div>
 
         <!-- Input Section -->
@@ -90,11 +96,11 @@
         <div class="grid grid-cols-2 gap-6 mb-8">
             <div class="text-center p-6 bg-blue-50 rounded-xl">
                 <div class="text-4xl font-bold text-blue-600 mb-2" id="totalPaired">0</div>
-                <div class="text-sm text-gray-600 uppercase tracking-wide">Paired</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Total Paired</div>
             </div>
             <div class="text-center p-6 bg-purple-50 rounded-xl">
                 <div class="text-4xl font-bold text-purple-600 mb-2" id="remainingNames">0</div>
-                <div class="text-sm text-gray-600 uppercase tracking-wide">Remaining</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Names Left</div>
             </div>
         </div>
 
@@ -107,12 +113,12 @@
 
         <!-- Pairing History -->
         <div id="pairingsList" class="mb-6 hidden">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Pairing History:</h3>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">All Pairings (Shared):</h3>
             <div class="max-h-60 overflow-y-auto scrollbar-hide bg-white bg-opacity-30 rounded-xl p-4" id="pairingsContent">
             </div>
         </div>
 
-        <!-- Reset Button -->
+        <!-- Control Buttons -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <button 
                 onclick="refreshData()"
@@ -128,6 +134,7 @@
             </button>
         </div>
 
+        <!-- Last Updated Info -->
         <div class="text-center mt-4">
             <p class="text-xs text-gray-500">
                 Last updated: <span id="lastUpdated">Never</span>
@@ -136,18 +143,26 @@
     </div>
 
     <script>
+        // Storage keys
+        const STORAGE_KEYS = {
+            AVAILABLE_NAMES: 'studentPairing_availableNames',
+            PAIRINGS: 'studentPairing_pairings',
+            USED_INPUT_NAMES: 'studentPairing_usedInputNames',
+            LAST_UPDATED: 'studentPairing_lastUpdated'
+        };
+
         // Predefined list of names
-        const namesList = [
-            "Okoro Rhume David", "Ojehonmon Israel Monite", "Ayomide Oyindamola Akerele", "Akinade Monsurat yetunde", "Alex precious Oziomachukwu", 
+        const DEFAULT_NAMES_LIST = [
+             "Okoro Rhume David", "Ojehonmon Israel Monite", "Ayomide Oyindamola Akerele", "Akinade Monsurat yetunde", "Alex precious Oziomachukwu", 
              "Isaac Okoro Supuruchi", "Akinyemi Samuel Ayodeji ", "Ozioma great" 
         ];
 
-        // Available names (copy of original list)
-        let availableNames = [...namesList];
+        // Global variables
+        let availableNames = [];
         let pairings = [];
         let usedInputNames = new Set();
 
-
+        // Load data from localStorage
         function loadFromStorage() {
             try {
                 // Load available names
@@ -208,8 +223,8 @@
 
         // Initialize the system
         function initializeSystem() {
-            updateStats();
-            displayNameChips();
+            loadFromStorage();
+            updateDisplay();
             
             // Add enter key support
             document.getElementById('studentName').addEventListener('keypress', function(e) {
@@ -217,6 +232,16 @@
                     pairStudent();
                 }
             });
+
+            // Auto-refresh every 30 seconds to show updates from other users
+            setInterval(refreshData, 30000);
+        }
+
+        // Refresh data from storage (to see updates from other users)
+        function refreshData() {
+            loadFromStorage();
+            updateDisplay();
+            showAlert('Data refreshed! 🔄', 'success');
         }
 
         function pairStudent() {
@@ -252,19 +277,21 @@
             const pairing = {
                 student: studentName,
                 partner: pairedName,
-                timestamp: new Date().toLocaleString()
+                timestamp: new Date().toLocaleString(),
+                id: Date.now() + Math.random() // Unique ID for each pairing
             };
             
             // Add to pairings array
             pairings.push(pairing);
             
+            // Save to storage
+            saveToStorage();
+            
             // Show result
             showPairingResult(studentName, pairedName);
             
             // Update display
-            updateStats();
-            displayNameChips();
-            updatePairingsList();
+            updateDisplay();
             
             // Clear input
             studentNameInput.value = '';
@@ -274,6 +301,7 @@
             const resultDiv = document.getElementById('pairingResult');
             resultDiv.innerHTML = `
                 <strong>${studentName}</strong> is paired with <strong>${pairedName}</strong>! 🎉
+                <div class="text-sm mt-2 opacity-90">This pairing is now saved and visible to all users!</div>
             `;
             resultDiv.classList.remove('hidden', 'opacity-0', 'translate-y-4');
             resultDiv.classList.add('opacity-100', 'translate-y-0', 'fade-in');
@@ -285,6 +313,12 @@
                     resultDiv.classList.remove('pulse-animation');
                 }, 500);
             }, 100);
+        }
+
+        function updateDisplay() {
+            updateStats();
+            displayNameChips();
+            updatePairingsList();
         }
 
         function updateStats() {
@@ -300,16 +334,17 @@
             const nameChipsContainer = document.getElementById('nameChips');
             nameChipsContainer.innerHTML = '';
             
-            namesList.forEach(name => {
+            DEFAULT_NAMES_LIST.forEach(name => {
                 const chip = document.createElement('span');
                 const isUsed = !availableNames.includes(name);
                 
-                chip.className = `px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 ${
+                chip.className = `px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 cursor-pointer ${
                     isUsed 
                         ? 'bg-red-100 text-red-600 line-through opacity-60' 
                         : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                 }`;
                 chip.textContent = name;
+                chip.title = isUsed ? 'This name has been paired' : 'Available for pairing';
                 
                 nameChipsContainer.appendChild(chip);
             });
@@ -323,16 +358,22 @@
                 pairingsListDiv.classList.remove('hidden');
                 pairingsContent.innerHTML = '';
                 
-                pairings.forEach((pairing, index) => {
+                // Sort pairings by timestamp (newest first)
+                const sortedPairings = [...pairings].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                sortedPairings.forEach((pairing, index) => {
                     const pairingItem = document.createElement('div');
-                    pairingItem.className = 'flex justify-between items-center p-3 border-b border-gray-200 last:border-b-0';
+                    pairingItem.className = 'flex justify-between items-center p-3 border-b border-gray-200 last:border-b-0 hover:bg-white hover:bg-opacity-20 transition-all duration-200';
                     pairingItem.innerHTML = `
                         <span class="font-medium">
                             <strong class="text-blue-600">${pairing.student}</strong> 
                             <span class="text-gray-500">↔</span> 
                             <strong class="text-purple-600">${pairing.partner}</strong>
                         </span>
-                        <small class="text-gray-500 text-xs">${pairing.timestamp}</small>
+                        <div class="text-right">
+                            <small class="text-gray-500 text-xs block">${pairing.timestamp}</small>
+                            <small class="text-gray-400 text-xs">Pair #${pairings.length - index}</small>
+                        </div>
                     `;
                     pairingsContent.appendChild(pairingItem);
                 });
@@ -343,14 +384,18 @@
 
         function resetSystem() {
             if (pairings.length > 0) {
-                const confirm = window.confirm('Are you sure you want to reset all pairings? This action cannot be undone.');
+                const confirmMessage = `Are you sure you want to reset all pairings? This will:\n\n• Delete all ${pairings.length} pairings\n• Reset all available names\n• Clear all used input names\n\nThis action affects ALL users and cannot be undone.`;
+                const confirm = window.confirm(confirmMessage);
                 if (!confirm) return;
             }
             
             // Reset all data
-            availableNames = [...namesList];
+            availableNames = [...DEFAULT_NAMES_LIST];
             pairings = [];
             usedInputNames.clear();
+            
+            // Save to storage
+            saveToStorage();
             
             // Reset UI
             const resultDiv = document.getElementById('pairingResult');
@@ -358,12 +403,10 @@
             document.getElementById('studentName').value = '';
             
             // Update display
-            updateStats();
-            displayNameChips();
-            updatePairingsList();
+            updateDisplay();
             
             // Show success message
-            showAlert('System reset successfully! 🔄', 'success');
+            showAlert('System reset successfully! All data cleared for all users. 🔄', 'success');
         }
 
         function showAlert(message, type = 'info') {
@@ -389,6 +432,15 @@
 
         // Initialize when page loads
         window.addEventListener('load', initializeSystem);
+
+        // Handle browser storage events (when other tabs/users make changes)
+        window.addEventListener('storage', function(e) {
+            if (Object.values(STORAGE_KEYS).includes(e.key)) {
+                loadFromStorage();
+                updateDisplay();
+                showAlert('Data updated by another user! 🔄', 'info');
+            }
+        });
     </script>
 </body>
 </html>
