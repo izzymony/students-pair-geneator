@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Name Pairing System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css');
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        
+        .pulse-animation {
+            animation: pulse 0.5s ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .gradient-text {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="glass-effect rounded-3xl shadow-2xl p-8 max-w-2xl w-full border border-white border-opacity-20">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">
+                🎯 Student Name Pairing System
+            </h1>
+            <p class="text-gray-600">Enter your name to find your perfect study partner!</p>
+        </div>
+
+        <!-- Input Section -->
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input 
+                    type="text" 
+                    id="studentName" 
+                    placeholder="Enter your name..." 
+                    maxlength="50"
+                    class="flex-1 px-6 py-4 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-all duration-300 text-lg bg-white bg-opacity-90"
+                >
+                <button 
+                    id="pairBtn" 
+                    onclick="pairStudent()"
+                    class="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                    Find My Partner
+                </button>
+            </div>
+        </div>
+
+        <!-- Pairing Result -->
+        <div id="pairingResult" class="mb-8 p-6 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-xl font-semibold text-lg text-center opacity-0 transform translate-y-4 transition-all duration-500 hidden">
+        </div>
+
+        <!-- Statistics -->
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <div class="text-center p-6 bg-blue-50 rounded-xl">
+                <div class="text-4xl font-bold text-blue-600 mb-2" id="totalPaired">0</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Paired</div>
+            </div>
+            <div class="text-center p-6 bg-purple-50 rounded-xl">
+                <div class="text-4xl font-bold text-purple-600 mb-2" id="remainingNames">0</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Remaining</div>
+            </div>
+        </div>
+
+        <!-- Available Names -->
+        <div class="mb-8">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Available Names:</h3>
+            <div class="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto scrollbar-hide p-4 bg-white bg-opacity-30 rounded-xl" id="nameChips">
+            </div>
+        </div>
+
+        <!-- Pairing History -->
+        <div id="pairingsList" class="mb-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Pairing History:</h3>
+            <div class="max-h-60 overflow-y-auto scrollbar-hide bg-white bg-opacity-30 rounded-xl p-4" id="pairingsContent">
+            </div>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <button 
+                onclick="refreshData()"
+                class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+            >
+                🔄 Refresh Data
+            </button>
+            <button 
+                onclick="resetSystem()"
+                class="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+            >
+                🗑️ Reset All
+            </button>
+        </div>
+
+        <div class="text-center mt-4">
+            <p class="text-xs text-gray-500">
+                Last updated: <span id="lastUpdated">Never</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Predefined list of names
+        const namesList = [
+            "Okoro Rhume David", "Ojehonmon Israel Monite", "Ayomide Oyindamola Akerele", "Akinade Monsurat yetunde", "Alex precious Oziomachukwu", 
+             "Isaac Okoro Supuruchi", "Akinyemi Samuel Ayodeji ", "Ozioma great" 
+        ];
+
+        // Available names (copy of original list)
+        let availableNames = [...namesList];
+        let pairings = [];
+        let usedInputNames = new Set();
+
+
+        function loadFromStorage() {
+            try {
+                // Load available names
+                const savedAvailableNames = localStorage.getItem(STORAGE_KEYS.AVAILABLE_NAMES);
+                if (savedAvailableNames) {
+                    availableNames = JSON.parse(savedAvailableNames);
+                } else {
+                    availableNames = [...DEFAULT_NAMES_LIST];
+                    saveToStorage();
+                }
+
+                // Load pairings
+                const savedPairings = localStorage.getItem(STORAGE_KEYS.PAIRINGS);
+                if (savedPairings) {
+                    pairings = JSON.parse(savedPairings);
+                } else {
+                    pairings = [];
+                }
+
+                // Load used input names
+                const savedUsedInputNames = localStorage.getItem(STORAGE_KEYS.USED_INPUT_NAMES);
+                if (savedUsedInputNames) {
+                    usedInputNames = new Set(JSON.parse(savedUsedInputNames));
+                } else {
+                    usedInputNames = new Set();
+                }
+
+                // Update last updated time
+                const lastUpdated = localStorage.getItem(STORAGE_KEYS.LAST_UPDATED);
+                if (lastUpdated) {
+                    document.getElementById('lastUpdated').textContent = new Date(lastUpdated).toLocaleString();
+                }
+
+            } catch (error) {
+                console.error('Error loading from storage:', error);
+                // Fall back to defaults
+                availableNames = [...DEFAULT_NAMES_LIST];
+                pairings = [];
+                usedInputNames = new Set();
+            }
+        }
+
+        // Save data to localStorage
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.AVAILABLE_NAMES, JSON.stringify(availableNames));
+                localStorage.setItem(STORAGE_KEYS.PAIRINGS, JSON.stringify(pairings));
+                localStorage.setItem(STORAGE_KEYS.USED_INPUT_NAMES, JSON.stringify([...usedInputNames]));
+                localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
+                
+                // Update last updated display
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+            } catch (error) {
+                console.error('Error saving to storage:', error);
+                showAlert('Error saving data. Please try again.', 'error');
+            }
+        }
+
+        // Initialize the system
+        function initializeSystem() {
+            updateStats();
+            displayNameChips();
+            
+            // Add enter key support
+            document.getElementById('studentName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    pairStudent();
+                }
+            });
+        }
+
+        function pairStudent() {
+            const studentNameInput = document.getElementById('studentName');
+            const studentName = studentNameInput.value.trim();
+            
+            if (!studentName) {
+                showAlert('Please enter your name!', 'warning');
+                return;
+            }
+
+            if (usedInputNames.has(studentName.toLowerCase())) {
+                showAlert('This name has already been used! Please enter a different name.', 'error');
+                return;
+            }
+
+            if (availableNames.length === 0) {
+                showAlert('No more names available for pairing!', 'info');
+                return;
+            }
+
+            // Get random name from available names
+            const randomIndex = Math.floor(Math.random() * availableNames.length);
+            const pairedName = availableNames[randomIndex];
+            
+            // Remove the paired name from available names
+            availableNames.splice(randomIndex, 1);
+            
+            // Add to used input names
+            usedInputNames.add(studentName.toLowerCase());
+            
+            // Create pairing object
+            const pairing = {
+                student: studentName,
+                partner: pairedName,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // Add to pairings array
+            pairings.push(pairing);
+            
+            // Show result
+            showPairingResult(studentName, pairedName);
+            
+            // Update display
+            updateStats();
+            displayNameChips();
+            updatePairingsList();
+            
+            // Clear input
+            studentNameInput.value = '';
+        }
+
+        function showPairingResult(studentName, pairedName) {
+            const resultDiv = document.getElementById('pairingResult');
+            resultDiv.innerHTML = `
+                <strong>${studentName}</strong> is paired with <strong>${pairedName}</strong>! 🎉
+            `;
+            resultDiv.classList.remove('hidden', 'opacity-0', 'translate-y-4');
+            resultDiv.classList.add('opacity-100', 'translate-y-0', 'fade-in');
+            
+            // Add pulse animation
+            setTimeout(() => {
+                resultDiv.classList.add('pulse-animation');
+                setTimeout(() => {
+                    resultDiv.classList.remove('pulse-animation');
+                }, 500);
+            }, 100);
+        }
+
+        function updateStats() {
+            document.getElementById('totalPaired').textContent = pairings.length;
+            document.getElementById('remainingNames').textContent = availableNames.length;
+            
+            // Disable button if no names left
+            const pairBtn = document.getElementById('pairBtn');
+            pairBtn.disabled = availableNames.length === 0;
+        }
+
+        function displayNameChips() {
+            const nameChipsContainer = document.getElementById('nameChips');
+            nameChipsContainer.innerHTML = '';
+            
+            namesList.forEach(name => {
+                const chip = document.createElement('span');
+                const isUsed = !availableNames.includes(name);
+                
+                chip.className = `px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 ${
+                    isUsed 
+                        ? 'bg-red-100 text-red-600 line-through opacity-60' 
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`;
+                chip.textContent = name;
+                
+                nameChipsContainer.appendChild(chip);
+            });
+        }
+
+        function updatePairingsList() {
+            const pairingsListDiv = document.getElementById('pairingsList');
+            const pairingsContent = document.getElementById('pairingsContent');
+            
+            if (pairings.length > 0) {
+                pairingsListDiv.classList.remove('hidden');
+                pairingsContent.innerHTML = '';
+                
+                pairings.forEach((pairing, index) => {
+                    const pairingItem = document.createElement('div');
+                    pairingItem.className = 'flex justify-between items-center p-3 border-b border-gray-200 last:border-b-0';
+                    pairingItem.innerHTML = `
+                        <span class="font-medium">
+                            <strong class="text-blue-600">${pairing.student}</strong> 
+                            <span class="text-gray-500">↔</span> 
+                            <strong class="text-purple-600">${pairing.partner}</strong>
+                        </span>
+                        <small class="text-gray-500 text-xs">${pairing.timestamp}</small>
+                    `;
+                    pairingsContent.appendChild(pairingItem);
+                });
+            } else {
+                pairingsListDiv.classList.add('hidden');
+            }
+        }
+
+        function resetSystem() {
+            if (pairings.length > 0) {
+                const confirm = window.confirm('Are you sure you want to reset all pairings? This action cannot be undone.');
+                if (!confirm) return;
+            }
+            
+            // Reset all data
+            availableNames = [...namesList];
+            pairings = [];
+            usedInputNames.clear();
+            
+            // Reset UI
+            const resultDiv = document.getElementById('pairingResult');
+            resultDiv.classList.add('hidden', 'opacity-0', 'translate-y-4');
+            document.getElementById('studentName').value = '';
+            
+            // Update display
+            updateStats();
+            displayNameChips();
+            updatePairingsList();
+            
+            // Show success message
+            showAlert('System reset successfully! 🔄', 'success');
+        }
+
+        function showAlert(message, type = 'info') {
+            const resultDiv = document.getElementById('pairingResult');
+            const colorClasses = {
+                'success': 'from-green-500 to-emerald-600',
+                'error': 'from-red-500 to-pink-600',
+                'warning': 'from-yellow-500 to-orange-600',
+                'info': 'from-blue-500 to-indigo-600'
+            };
+            
+            resultDiv.className = `mb-8 p-6 bg-gradient-to-r ${colorClasses[type]} text-white rounded-xl font-semibold text-lg text-center opacity-100 transform translate-y-0 transition-all duration-500`;
+            resultDiv.innerHTML = message;
+            resultDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                resultDiv.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => {
+                    resultDiv.classList.add('hidden');
+                }, 500);
+            }, 3000);
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeSystem);
+    </script>
+</body>
+</html>
