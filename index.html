@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -153,8 +154,9 @@
 
         // Predefined list of names
         const DEFAULT_NAMES_LIST = [
-             "Okoro Rhume David", "Ojehonmon Israel Monite", "Ayomide Oyindamola Akerele", "Akinade Monsurat yetunde", "Alex precious Oziomachukwu", 
-             "Isaac Okoro Supuruchi", "Akinyemi Samuel Ayodeji ", "Ozioma great" 
+            "Okoro Rhume David", "Ojehonmon Israel Monite", "Ayomide Oyindamola Akerele", 
+            "Akinade Monsurat yetunde", "Alex precious Oziomachukwu", "Isaac Okoro Supuruchi", 
+            "Akinyemi Samuel Ayodeji", "Ozioma great"
         ];
 
         // Global variables
@@ -167,41 +169,22 @@
             try {
                 // Load available names
                 const savedAvailableNames = localStorage.getItem(STORAGE_KEYS.AVAILABLE_NAMES);
-                if (savedAvailableNames) {
-                    availableNames = JSON.parse(savedAvailableNames);
-                } else {
-                    availableNames = [...DEFAULT_NAMES_LIST];
-                    saveToStorage();
-                }
+                availableNames = savedAvailableNames ? JSON.parse(savedAvailableNames) : [...DEFAULT_NAMES_LIST];
 
                 // Load pairings
                 const savedPairings = localStorage.getItem(STORAGE_KEYS.PAIRINGS);
-                if (savedPairings) {
-                    pairings = JSON.parse(savedPairings);
-                } else {
-                    pairings = [];
-                }
+                pairings = savedPairings ? JSON.parse(savedPairings) : [];
 
                 // Load used input names
                 const savedUsedInputNames = localStorage.getItem(STORAGE_KEYS.USED_INPUT_NAMES);
-                if (savedUsedInputNames) {
-                    usedInputNames = new Set(JSON.parse(savedUsedInputNames));
-                } else {
-                    usedInputNames = new Set();
-                }
+                usedInputNames = savedUsedInputNames ? new Set(JSON.parse(savedUsedInputNames)) : new Set();
 
                 // Update last updated time
-                const lastUpdated = localStorage.getItem(STORAGE_KEYS.LAST_UPDATED);
-                if (lastUpdated) {
-                    document.getElementById('lastUpdated').textContent = new Date(lastUpdated).toLocaleString();
-                }
+                updateLastUpdatedDisplay();
 
             } catch (error) {
                 console.error('Error loading from storage:', error);
-                // Fall back to defaults
-                availableNames = [...DEFAULT_NAMES_LIST];
-                pairings = [];
-                usedInputNames = new Set();
+                resetToDefaults();
             }
         }
 
@@ -213,12 +196,25 @@
                 localStorage.setItem(STORAGE_KEYS.USED_INPUT_NAMES, JSON.stringify([...usedInputNames]));
                 localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
                 
-                // Update last updated display
-                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                updateLastUpdatedDisplay();
             } catch (error) {
                 console.error('Error saving to storage:', error);
                 showAlert('Error saving data. Please try again.', 'error');
             }
+        }
+
+        function updateLastUpdatedDisplay() {
+            const lastUpdated = localStorage.getItem(STORAGE_KEYS.LAST_UPDATED);
+            if (lastUpdated) {
+                document.getElementById('lastUpdated').textContent = new Date(lastUpdated).toLocaleString();
+            }
+        }
+
+        // Reset to default values
+        function resetToDefaults() {
+            availableNames = [...DEFAULT_NAMES_LIST];
+            pairings = [];
+            usedInputNames = new Set();
         }
 
         // Initialize the system
@@ -237,46 +233,74 @@
             setInterval(refreshData, 30000);
         }
 
-        // Refresh data from storage (to see updates from other users)
+        // Refresh data from storage
         function refreshData() {
             loadFromStorage();
             updateDisplay();
             showAlert('Data refreshed! 🔄', 'success');
         }
 
+        // Pair a student with a random available name
         function pairStudent() {
             const studentNameInput = document.getElementById('studentName');
             const studentName = studentNameInput.value.trim();
             
-            if (!studentName) {
-                showAlert('Please enter your name!', 'warning');
-                return;
-            }
+            // Validate input
+            if (!validateInput(studentName)) return;
 
-            if (usedInputNames.has(studentName.toLowerCase())) {
-                showAlert('This name has already been used! Please enter a different name.', 'error');
-                return;
-            }
-
-            if (availableNames.length === 0) {
+            // Get random partner name
+            const partnerName = getRandomPartnerName();
+            if (!partnerName) {
                 showAlert('No more names available for pairing!', 'info');
                 return;
             }
 
-            // Get random name from available names
+            // Create and save pairing
+            createPairing(studentName, partnerName);
+            
+            // Update UI
+            showPairingResult(studentName, partnerName);
+            updateDisplay();
+            studentNameInput.value = '';
+        }
+
+        // Validate student name input
+        function validateInput(studentName) {
+            if (!studentName) {
+                showAlert('Please enter your name!', 'warning');
+                return false;
+            }
+
+            if (usedInputNames.has(studentName.toLowerCase())) {
+                showAlert('This name has already been used! Please enter a different name.', 'error');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Get a random partner name from available names
+        function getRandomPartnerName() {
+            if (availableNames.length === 0) return null;
+            
             const randomIndex = Math.floor(Math.random() * availableNames.length);
-            const pairedName = availableNames[randomIndex];
+            const partnerName = availableNames[randomIndex];
             
             // Remove the paired name from available names
             availableNames.splice(randomIndex, 1);
             
+            return partnerName;
+        }
+
+        // Create and save a new pairing
+        function createPairing(studentName, partnerName) {
             // Add to used input names
             usedInputNames.add(studentName.toLowerCase());
             
             // Create pairing object
             const pairing = {
                 student: studentName,
-                partner: pairedName,
+                partner: partnerName,
                 timestamp: new Date().toLocaleString(),
                 id: Date.now() + Math.random() // Unique ID for each pairing
             };
@@ -286,15 +310,6 @@
             
             // Save to storage
             saveToStorage();
-            
-            // Show result
-            showPairingResult(studentName, pairedName);
-            
-            // Update display
-            updateDisplay();
-            
-            // Clear input
-            studentNameInput.value = '';
         }
 
         function showPairingResult(studentName, pairedName) {
@@ -390,11 +405,7 @@
             }
             
             // Reset all data
-            availableNames = [...DEFAULT_NAMES_LIST];
-            pairings = [];
-            usedInputNames.clear();
-            
-            // Save to storage
+            resetToDefaults();
             saveToStorage();
             
             // Reset UI
