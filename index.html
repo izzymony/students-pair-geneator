@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,9 +59,9 @@
         <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800 mb-2">
-                🎯 Student Name Pairing System
+                🎯 Strict Student Pairing System
             </h1>
-            <p class="text-gray-600">Enter your name to find your perfect study partner!</p>
+            <p class="text-gray-600">Enter your name to find your one-and-only study partner!</p>
             <div class="flex items-center justify-center mt-2">
                 <div class="w-2 h-2 bg-green-500 rounded-full live-indicator mr-2"></div>
                 <span class="text-sm text-gray-500">Live - Shared across all users</span>
@@ -97,17 +96,17 @@
         <div class="grid grid-cols-2 gap-6 mb-8">
             <div class="text-center p-6 bg-blue-50 rounded-xl">
                 <div class="text-4xl font-bold text-blue-600 mb-2" id="totalPaired">0</div>
-                <div class="text-sm text-gray-600 uppercase tracking-wide">Total Paired</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Total Pairings</div>
             </div>
             <div class="text-center p-6 bg-purple-50 rounded-xl">
                 <div class="text-4xl font-bold text-purple-600 mb-2" id="remainingNames">0</div>
-                <div class="text-sm text-gray-600 uppercase tracking-wide">Names Left</div>
+                <div class="text-sm text-gray-600 uppercase tracking-wide">Available Students</div>
             </div>
         </div>
 
         <!-- Available Names -->
         <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Available Names:</h3>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Available Students:</h3>
             <div class="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto scrollbar-hide p-4 bg-white bg-opacity-30 rounded-xl" id="nameChips">
             </div>
         </div>
@@ -146,23 +145,23 @@
     <script>
         // Storage keys
         const STORAGE_KEYS = {
-            AVAILABLE_NAMES: 'studentPairing_availableNames',
-            PAIRINGS: 'studentPairing_pairings',
-            USED_INPUT_NAMES: 'studentPairing_usedInputNames',
-            LAST_UPDATED: 'studentPairing_lastUpdated'
+            AVAILABLE_NAMES: 'strictStudentPairing_availableNames',
+            PAIRINGS: 'strictStudentPairing_pairings',
+            USED_NAMES: 'strictStudentPairing_usedNames',
+            LAST_UPDATED: 'strictStudentPairing_lastUpdated'
         };
 
         // Predefined list of names
         const DEFAULT_NAMES_LIST = [
-            "David", " Israel ", "Oyindamola ", 
-            "Monsurat", " precious ", "Isaac ", 
-            " Samuel ", " great"
-        ];
+            "David", "Israel", "Oyindamola", 
+            "Monsurat", "Precious", "Isaac", 
+            "Samuel", "Great"
+        ].map(name => name.trim()).filter(name => name);
 
         // Global variables
         let availableNames = [];
         let pairings = [];
-        let usedInputNames = new Set();
+        let usedNames = new Set(); // Tracks ALL used names (both students and partners)
 
         // Load data from localStorage
         function loadFromStorage() {
@@ -175,11 +174,10 @@
                 const savedPairings = localStorage.getItem(STORAGE_KEYS.PAIRINGS);
                 pairings = savedPairings ? JSON.parse(savedPairings) : [];
 
-                // Load used input names
-                const savedUsedInputNames = localStorage.getItem(STORAGE_KEYS.USED_INPUT_NAMES);
-                usedInputNames = savedUsedInputNames ? new Set(JSON.parse(savedUsedInputNames)) : new Set();
+                // Load used names
+                const savedUsedNames = localStorage.getItem(STORAGE_KEYS.USED_NAMES);
+                usedNames = savedUsedNames ? new Set(JSON.parse(savedUsedNames)) : new Set();
 
-                // Update last updated time
                 updateLastUpdatedDisplay();
 
             } catch (error) {
@@ -193,7 +191,7 @@
             try {
                 localStorage.setItem(STORAGE_KEYS.AVAILABLE_NAMES, JSON.stringify(availableNames));
                 localStorage.setItem(STORAGE_KEYS.PAIRINGS, JSON.stringify(pairings));
-                localStorage.setItem(STORAGE_KEYS.USED_INPUT_NAMES, JSON.stringify([...usedInputNames]));
+                localStorage.setItem(STORAGE_KEYS.USED_NAMES, JSON.stringify([...usedNames]));
                 localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
                 
                 updateLastUpdatedDisplay();
@@ -214,7 +212,7 @@
         function resetToDefaults() {
             availableNames = [...DEFAULT_NAMES_LIST];
             pairings = [];
-            usedInputNames = new Set();
+            usedNames = new Set();
         }
 
         // Initialize the system
@@ -248,17 +246,14 @@
             // Validate input
             if (!validateInput(studentName)) return;
 
-            // Get random partner name
             const partnerName = getRandomPartnerName();
             if (!partnerName) {
-                showAlert('No more names available for pairing!', 'info');
+                showAlert('No available partners left!', 'info');
                 return;
             }
 
-            // Create and save pairing
             createPairing(studentName, partnerName);
             
-            // Update UI
             showPairingResult(studentName, partnerName);
             updateDisplay();
             studentNameInput.value = '';
@@ -271,8 +266,8 @@
                 return false;
             }
 
-            if (usedInputNames.has(studentName.toLowerCase())) {
-                showAlert('This name has already been used! Please enter a different name.', 'error');
+            if (usedNames.has(studentName.toLowerCase())) {
+                showAlert('This name has already been paired!', 'error');
                 return false;
             }
 
@@ -281,42 +276,47 @@
 
         // Get a random partner name from available names
         function getRandomPartnerName() {
-            if (availableNames.length === 0) return null;
+            // Filter available names to only those not already used
+            const trulyAvailable = availableNames.filter(name => 
+                !usedNames.has(name.toLowerCase()) && 
+                name.toLowerCase() !== document.getElementById('studentName').value.trim().toLowerCase()
+            );
             
-            const randomIndex = Math.floor(Math.random() * availableNames.length);
-            const partnerName = availableNames[randomIndex];
+            if (trulyAvailable.length === 0) return null;
             
-            // Remove the paired name from available names
-            availableNames.splice(randomIndex, 1);
-            
-            return partnerName;
+            const randomIndex = Math.floor(Math.random() * trulyAvailable.length);
+            return trulyAvailable[randomIndex];
         }
 
         // Create and save a new pairing
         function createPairing(studentName, partnerName) {
-            // Add to used input names
-            usedInputNames.add(studentName.toLowerCase());
+            // Add both names to used names (case-insensitive)
+            usedNames.add(studentName.toLowerCase());
+            usedNames.add(partnerName.toLowerCase());
             
+            // Remove both names from available names
+            availableNames = availableNames.filter(name => 
+                name.toLowerCase() !== studentName.toLowerCase() && 
+                name.toLowerCase() !== partnerName.toLowerCase()
+            );
+
             // Create pairing object
             const pairing = {
                 student: studentName,
                 partner: partnerName,
                 timestamp: new Date().toLocaleString(),
-                id: Date.now() + Math.random() // Unique ID for each pairing
+                id: Date.now() + Math.random()
             };
             
-            // Add to pairings array
             pairings.push(pairing);
-            
-            // Save to storage
             saveToStorage();
         }
 
         function showPairingResult(studentName, pairedName) {
             const resultDiv = document.getElementById('pairingResult');
             resultDiv.innerHTML = `
-                <strong>${studentName}</strong> is paired with <strong>${pairedName}</strong>! 🎉
-                <div class="text-sm mt-2 opacity-90">This pairing is now saved and visible to all users!</div>
+                <strong>${studentName}</strong> is permanently paired with <strong>${pairedName}</strong>! 💞
+                <div class="text-sm mt-2 opacity-90">Neither name can be used again in any pairing.</div>
             `;
             resultDiv.classList.remove('hidden', 'opacity-0', 'translate-y-4');
             resultDiv.classList.add('opacity-100', 'translate-y-0', 'fade-in');
@@ -340,9 +340,10 @@
             document.getElementById('totalPaired').textContent = pairings.length;
             document.getElementById('remainingNames').textContent = availableNames.length;
             
-            // Disable button if no names left
+            // Disable button if no names left or only 1 name remaining (can't pair with self)
             const pairBtn = document.getElementById('pairBtn');
-            pairBtn.disabled = availableNames.length === 0;
+            pairBtn.disabled = availableNames.length <= 1 || 
+                (availableNames.length === 1 && usedNames.has(availableNames[0].toLowerCase()));
         }
 
         function displayNameChips() {
@@ -351,7 +352,7 @@
             
             DEFAULT_NAMES_LIST.forEach(name => {
                 const chip = document.createElement('span');
-                const isUsed = !availableNames.includes(name);
+                const isUsed = usedNames.has(name.toLowerCase());
                 
                 chip.className = `px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 cursor-pointer ${
                     isUsed 
@@ -359,7 +360,7 @@
                         : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                 }`;
                 chip.textContent = name;
-                chip.title = isUsed ? 'This name has been paired' : 'Available for pairing';
+                chip.title = isUsed ? 'This student has been paired' : 'Available for pairing';
                 
                 nameChipsContainer.appendChild(chip);
             });
@@ -399,7 +400,7 @@
 
         function resetSystem() {
             if (pairings.length > 0) {
-                const confirmMessage = `Are you sure you want to reset all pairings? This will:\n\n• Delete all ${pairings.length} pairings\n• Reset all available names\n• Clear all used input names\n\nThis action affects ALL users and cannot be undone.`;
+                const confirmMessage = `Are you sure you want to reset all pairings? This will:\n\n• Delete all ${pairings.length} pairings\n• Make all ${DEFAULT_NAMES_LIST.length} names available again\n• Clear all pairing history\n\nThis action affects ALL users and cannot be undone.`;
                 const confirm = window.confirm(confirmMessage);
                 if (!confirm) return;
             }
@@ -417,7 +418,7 @@
             updateDisplay();
             
             // Show success message
-            showAlert('System reset successfully! All data cleared for all users. 🔄', 'success');
+            showAlert('System reset successfully! All names are now available again. 🔄', 'success');
         }
 
         function showAlert(message, type = 'info') {
